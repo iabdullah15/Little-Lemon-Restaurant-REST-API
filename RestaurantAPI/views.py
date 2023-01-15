@@ -8,9 +8,9 @@ from rest_framework import status
 from rest_framework import generics
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
 
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User, Group
 
-from .serializers import CategorySerializer, MenuItemSerializer, CartSerializer, OrderSerializer, OrderItemSerializer
+from .serializers import CategorySerializer, MenuItemSerializer, CartSerializer, OrderSerializer, OrderItemSerializer, UserSerializer
 from .models import Category, MenuItem, Cart, Order, OrderItem
 
 # Create your views here.
@@ -123,5 +123,38 @@ def single_menuitem(request:Request, id):
             return Response({"message": "You are not authorized to perform this action"}, status=status.HTTP_403_FORBIDDEN)
          
 
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def managers(request:Request):
+    
+    if request.user.groups.filter(name = "Manager").exists():
 
+        if request.method == "GET":
+            group = Group.objects.get(name='Manager')
+            managers = group.user_set.all()
+            
+            # managers = User.objects.filter(groups__name == "Manager")
 
+            serialized_data = UserSerializer(managers, many = True)
+
+            return Response(serialized_data.data, status=status.HTTP_200_OK)
+    
+
+        elif request.method == "POST":
+            
+            username = request.data.get('username')
+            user = User.objects.get(username = username)
+
+            if user:
+                user.groups.add(1)
+                serialized_data = UserSerializer(user)
+
+                return Response({"message": serialized_data.data})
+
+            else:
+                return Response({"message": "User does not exist"})
+
+    else:
+        return Response({"message": "You are not authorized to perform this action"}, status=status.HTTP_403_FORBIDDEN)
+
+    
