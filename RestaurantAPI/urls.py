@@ -6,6 +6,8 @@ urlpatterns = [
     path('menu-items', views.menuitems),
     path('menu-item/<int:id>', views.single_menuitem),
     path('groups/manager/users', views.managers),
-
+    path('groups/manager/users/<int:id>', views.remove_manager),
+    path('groups/delivery-crew/users', views.delivery_crew),
+    path('groups/delivery-crew/users/<int:id>', views.remove_delivery_crew),
     # path('menu-items', views.ListMenuItems.as_view()),
 ]

@@ -149,10 +149,10 @@ def managers(request:Request):
             managers = group.user_set.all()
 
             if user in managers:
-                return Response({"message": "User is already in the managers group"})
+                return Response({"message": "User is already in the managers group"}, status=status.HTTP_400_BAD_REQUEST)
             
             else: 
-                user.groups.add(1)
+                user.groups.add(group)
                 serialized_data = UserSerializer(user)
                 return Response({"message": serialized_data.data, "message": "User has been added to the managers group."}, status=status.HTTP_201_CREATED)
 
@@ -160,3 +160,84 @@ def managers(request:Request):
         return Response({"message": "You are not authorized to perform this action"}, status=status.HTTP_403_FORBIDDEN)
 
     
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def remove_manager(request:Request, id):
+
+    if request.user.groups.filter(name = "Manager").exists():
+
+        user = get_object_or_404(User, pk = id)
+        group = Group.objects.get(name = "Manager")
+
+        managers = group.user_set.all()
+
+        if user in managers:
+            user.groups.remove(group)
+            return Response({"message": "User has been removed from the manager group succesfully."}, status=status.HTTP_200_OK)
+
+        else:
+            return Response({"message": "This user is not a manager."}, status=status.HTTP_400_BAD_REQUEST)
+
+    else:
+        return Response({"message": "You are not authorized to perform this action"}, status=status.HTTP_403_FORBIDDEN)
+
+
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def delivery_crew(request:Request):
+
+    if request.user.groups.filter(name = "Manager").exists():
+
+        if request.method == 'GET':
+
+            group = Group.objects.get(name = "Delivery Crew")
+            delivery_crew = group.user_set.all()
+            
+            serialized_data = UserSerializer(delivery_crew, many = True)
+            return Response({"Delivery Crew": serialized_data.data})
+
+        elif request.method == "POST":
+
+            username = request.data.get('username')
+            user = get_object_or_404(User, username = username)
+
+            group = Group.objects.get(name = "Delivery Crew")
+            delivery_crew = group.user_set.all()
+
+            if user in delivery_crew:
+                return Response({"message": "User is already in the delivery crew group"}, status=status.HTTP_400_BAD_REQUEST)
+            
+            else: 
+                user.groups.add(group)
+                serialized_data = UserSerializer(user)
+                return Response({"message": serialized_data.data, "message": "User has been added to the delivery crew group."}, status=status.HTTP_201_CREATED)
+
+
+    else:
+        return Response({"message": "You are not authorized to perform this action"}, status=status.HTTP_403_FORBIDDEN)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def remove_delivery_crew(request:Request, id):
+
+    if request.user.groups.filter(name = "Manager").exists():
+
+        user = get_object_or_404(User, pk = id)
+        group = Group.objects.get(name = "Delivery Crew")
+
+        delivery_crew = group.user_set.all()
+
+        if user in delivery_crew:
+            user.groups.remove(group)
+            return Response({"message": "User has been removed from the delivery crew group succesfully."}, status=status.HTTP_200_OK)
+
+        else:
+            return Response({"message": "This user is not in the delivery crew."}, status=status.HTTP_400_BAD_REQUEST)
+
+    else:
+        return Response({"message": "You are not authorized to perform this action"}, status=status.HTTP_403_FORBIDDEN)
