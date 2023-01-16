@@ -143,16 +143,18 @@ def managers(request:Request):
         elif request.method == "POST":
             
             username = request.data.get('username')
-            user = User.objects.get(username = username)
+            user = get_object_or_404(User, username = username)
 
-            if user:
+            group = Group.objects.get(name = "Manager")
+            managers = group.user_set.all()
+
+            if user in managers:
+                return Response({"message": "User is already in the managers group"})
+            
+            else: 
                 user.groups.add(1)
                 serialized_data = UserSerializer(user)
-
-                return Response({"message": serialized_data.data})
-
-            else:
-                return Response({"message": "User does not exist"})
+                return Response({"message": serialized_data.data, "message": "User has been added to the managers group."}, status=status.HTTP_201_CREATED)
 
     else:
         return Response({"message": "You are not authorized to perform this action"}, status=status.HTTP_403_FORBIDDEN)
