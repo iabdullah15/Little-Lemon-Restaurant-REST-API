@@ -241,3 +241,77 @@ def remove_delivery_crew(request:Request, id):
 
     else:
         return Response({"message": "You are not authorized to perform this action"}, status=status.HTTP_403_FORBIDDEN)
+
+
+
+@api_view(['GET', 'POST', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def cart(request:Request):
+
+    if request.method == 'GET':
+
+        user = User.objects.get(username = request.user.username)
+        cart_items = Cart.objects.filter(user = user)
+        serialized_data = CartSerializer(cart_items, many = True)
+
+        return Response(serialized_data.data, status=status.HTTP_200_OK)
+
+    elif request.method == 'POST':
+        
+        item_title = request.data.get("item")
+        quantity = request.data.get("quantity")
+
+        if item_title and quantity:
+
+            user = User.objects.get(username = request.user.username)
+            menu_item = get_object_or_404(MenuItem, title = item_title)
+            unit_price = menu_item.price
+            total_price = int(quantity) * int(unit_price)
+
+            cart = Cart(user = user, menuitem = menu_item, quantity = quantity, unit_price = unit_price, price = total_price)
+            cart.save()
+
+            return Response({"message" : "Item succesfully added to the cart."}, status=status.HTTP_201_CREATED)
+
+        else:
+            return Response({"message":"Could not add item. Please try again."}, status=status.HTTP_409_CONFLICT)
+
+    
+    elif request.method == 'DELETE':
+
+        request_user = User.objects.get(username = request.user.username)
+        cart = Cart.objects.filter(user = request_user)
+
+        if cart:
+            cart.delete()
+            serialized_data = CartSerializer(cart, many = True)
+
+            return Response({"message": "Cart succesfully deleted"})
+
+        else:
+            return Response({"message": "Error! No Cart found."}, status=status.HTTP_404_NOT_FOUND)
+
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def orders(request:Request):
+    
+    if request.method == 'GET':
+
+        user = User.objects.get(username = request.user.username)
+        order = Order.objects.filter(user = user)
+        order_items = OrderItem.objects.filter(order = user)
+
+        order_serialized_data = OrderSerializer(order, many = True)
+        orderitem_serialized_data = OrderItemSerializer(order_items, many = True)
+
+        return Response({"Order": order_serialized_data.data, "Order Items": orderitem_serialized_data.data}, status=status.HTTP_200_OK)
+
+
+    elif request.method == 'POST':
+
+        user = User.objects.get(username = request.user.username)
+        delivery_crew = User.objects.get(username = "ahmed")
+        cart = Cart.objects.filter(user = user)
+        
