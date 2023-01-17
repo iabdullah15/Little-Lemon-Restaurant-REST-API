@@ -12,6 +12,9 @@ from django.contrib.auth.models import User, Group
 
 from .serializers import CategorySerializer, MenuItemSerializer, CartSerializer, OrderSerializer, OrderItemSerializer, UserSerializer
 from .models import Category, MenuItem, Cart, Order, OrderItem
+import datetime as dt
+from django.db.models.query import QuerySet
+
 
 # Create your views here.
 
@@ -293,25 +296,291 @@ def cart(request:Request):
 
 
 
+
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def orders(request:Request):
+
+    if request.method == 'GET':
+        
+        if request.user.groups.filter(name = "Manager").exists():
+
+            orders = Order.objects.all()
+            order_items = OrderItem.objects.all()
+
+            serialized_orders = OrderSerializer(orders, many = True)
+            serialized_order_items = OrderItemSerializer(order_items, many = True)
+
+            return Response({"Orders": serialized_orders.data, "Order Items": serialized_order_items.data})
+
+        elif request.user.groups.filter(name = "Delivery Crew").exists():
+
+            user = User.objects.get(username = request.user.username)
+            order = Order.objects.filter(delivery_crew = user)
+
+            order_items = OrderItem.objects.select_related('order').filter(order__in=order)
+
+            serialized_orders = OrderSerializer(order, many = True)
+            serialized_order_items = OrderItemSerializer(order_items, many = True)
+
+            return Response({"Orders": serialized_orders.data, "Order Items" : serialized_order_items.data})
+
+        
+        else:
+
+            user = User.objects.get(username = request.user.username)
+            order = Order.objects.filter(user = user)
+
+            order_items = OrderItem.objects.select_related('order').filter(order__in=order)
+
+            serialized_orders = OrderSerializer(order, many = True)
+            serialized_order_items = OrderItemSerializer(order_items, many = True)
+
+            return Response({"Orders": serialized_orders.data, "Order Items" : serialized_order_items.data})
+
+    
+    elif request.method == 'POST':
+
+        user = User.objects.get(username = request.user.username)
+        cart = Cart.objects.filter(user = user)
+
+        if cart:
+
+            delivery_crew = User.objects.get(username = "ahmed")
+            time = dt.datetime.now()
+            total_price = int()  #Total bill amount of order placed.
+
+            for items in cart:
+                total_price += int(items.price)
+
+            order = Order(user = user, delivery_crew = delivery_crew, status = 0, total = total_price, date = time)
+            order.save()
+
+            for items in cart:
+                order_item = OrderItem(order = order, menuitem = items.menuitem, quantity = items.quantity, unit_price = items.unit_price, price = items.price)
+                order_item.save()
+
+            cart.delete()
+
+            return Response({"An order has been created."}, status=status.HTTP_201_CREATED)
+
+        else:
+            return Response({"message": "There are no items in your cart."}, status=status.HTTP_400_BAD_REQUEST)
+
+
+
+@api_view(['GET', 'PUT', 'PATCH', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def single_order(request: Request, id):
     
     if request.method == 'GET':
 
         user = User.objects.get(username = request.user.username)
-        order = Order.objects.filter(user = user)
-        order_items = OrderItem.objects.filter(order = user)
+        order = get_object_or_404(Order, pk = id)
 
-        order_serialized_data = OrderSerializer(order, many = True)
-        orderitem_serialized_data = OrderItemSerializer(order_items, many = True)
+        if order.user == user:
+            order_items = OrderItem.objects.select_related('order').filter(order__exact=order)
 
-        return Response({"Order": order_serialized_data.data, "Order Items": orderitem_serialized_data.data}, status=status.HTTP_200_OK)
+            serialized_order_data = OrderSerializer(order)
+            serialized_order_items_data = OrderItemSerializer(order_items, many = True)
+
+            return Response({"Order": serialized_order_data.data, "Order Items": serialized_order_items_data.data}, status=status.HTTP_200_OK)
+
+        else:
+            return Response({"message": "You are not authorized to access this data."}, status=status.HTTP_403_FORBIDDEN)
 
 
-    elif request.method == 'POST':
+    elif request.method == 'PATCH':
 
-        user = User.objects.get(username = request.user.username)
-        delivery_crew = User.objects.get(username = "ahmed")
-        cart = Cart.objects.filter(user = user)
+        delivery_crew = request.data.get('delivery_crew')
+        order_status = request.data.get('status')
+        order = get_object_or_404(Order, pk = id)
+
+        if request.user.groups.filter(name = "Manager"):
+
+            if delivery_crew:
+
+                delivery_user = get_object_or_404(User, username = delivery_crew)
+                order.delivery_crew = delivery_user
+
+            if order_status:
+
+                order.status = order_status
+
+            order.save()
+            return Response({"message": "Order Succesfully updated."}, status=status.HTTP_200_OK)
+
+
+        elif request.user.groups.filter(name = "Delivery Crew").exists():
+
+            if order_status:
+
+                order.status = order_status
+
+            order.save()
+            return Response({"message": "Order Succesfully updated."}, status=status.HTTP_200_OK)
+            
+
+        else:
+            return Response({"message": "You are not authorized to access this data."}, status=status.HTTP_403_FORBIDDEN)
+
+    
+    elif request.method == 'DELETE':
+
+        if request.user.groups.filter(name = "Manager").exists():
+        
+            order = get_object_or_404(Order, pk = id)
+            order.delete()
+
+            return Response({"message": "Order succesfully deleted."}, status=status.HTTP_200_OK)
+
+        else:
+            return Response({"message": "You are not authorized to access this data."}, status=status.HTTP_403_FORBIDDEN)
+
+
+
+
+    
+   
+
+
+            
+
+
+
+
+
+
+
+
+
+
+                
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# @api_view(['GET', 'POST'])
+# @permission_classes([IsAuthenticated])
+# def orders(request:Request):
+    
+#     if request.method == 'GET':
+
+#         if request.user.groups.filter(name = "Manager").exists():
+
+#             order = Order.objects.all()
+#             order_items = OrderItem.objects.all()
+#             serialized_order_data = OrderSerializer(order, many = True)
+#             serialized_order_items_data = OrderItemSerializer(order_items, many = True)
+
+#             return Response({"Orders": serialized_order_data.data, "Order Items": serialized_order_items_data.data}, status=status.HTTP_200_OK)
+
+
+#         elif request.user.groups.filter(name = "Delivery Crew"):
+
+#             delivery_crew = User.objects.get(username = request.user.username)
+#             orders = Order.objects.filter(delivery_crew = delivery_crew)
+
+#             # order_items = list()
+
+#             # for items in orders:
+
+#             #     pass
+
+#             serialized_order_data = OrderSerializer(orders, many = True)
+
+#             for users in orders:
+#                 print(users.user)
+
+#             return Response({"Orders": serialized_order_data.data})
+
+
+#         else:
+
+#             user = User.objects.get(username = request.user.username)
+#             order = Order.objects.filter(user = user)
+#             order_items = OrderItem.objects.filter(order = user)
+
+#             order_serialized_data = OrderSerializer(order, many = True)
+#             orderitem_serialized_data = OrderItemSerializer(order_items, many = True)
+
+#             return Response({"Order": order_serialized_data.data, "Order Items": orderitem_serialized_data.data}, status=status.HTTP_200_OK)
+
+
+#     elif request.method == 'POST':
+
+#         user = User.objects.get(username = request.user.username)
+#         cart = Cart.objects.filter(user = user)
+
+#         if cart:
+
+#             delivery_crew = User.objects.get(username = "ahmed")
+#             time = dt.datetime.now()
+#             total_price = int()  #Total bill amount of order placed.
+
+#             for items in cart:
+#                 order_item = OrderItem(order = user, menuitem = items.menuitem, quantity = items.quantity, unit_price = items.unit_price, price = items.price)
+#                 order_item.save()
+#                 total_price += int(items.price)
+
+#             order = Order(user = user, delivery_crew = delivery_crew, status = 0, total = total_price, date = time)
+#             order.save()
+
+#             cart.delete()
+
+#             return Response({"message": "An order has been created"}, status = status.HTTP_201_CREATED)
+
+#         else:
+#             return Response({"message": "There are no items in your cart."}, status=status.HTTP_400_BAD_REQUEST)
+
+
+
+# @api_view(['GET', 'PUT', 'DELETE', 'PATCH'])
+# @permission_classes([IsAuthenticated])
+# def single_order(request:Request, id):
+
+#     if request.method == 'GET':
+
+#         user = User.objects.get(username = request.user.username)
+#         order = get_object_or_404(Order, pk = id)
+
+#         if user == order.user:
+
+#             order_items = OrderItem.objects.filter(order = user)
+#             serialized_order_items_data = OrderItemSerializer(order_items, many = True)
+
+#             return Response({"Order Items":serialized_order_items_data.data})
+
+#         else:
+#             return Response({"message" : "Not found"}, status=status.HTTP_404_NOT_FOUND)
+
+
+#     if request.method == 'DELETE':
+
+#         if request.user.groups.filter(name = "Manager").exists():
+
+#             order = get_object_or_404(Order, pk = id)
+#             order_items = OrderItem.objects.filter(order = order.user)
+
+#             orderSerialized = OrderSerializer(order)
+#             orderItemSerialized = OrderItemSerializer(order_items, many = True)
+
+#             return Response({"Order": orderSerialized.data, "Order Items": orderItemSerialized.data})
+
+#         else:
+#             return Response({"message": "You are not authorized to perform this action"}, status=status.HTTP_403_FORBIDDEN)
         

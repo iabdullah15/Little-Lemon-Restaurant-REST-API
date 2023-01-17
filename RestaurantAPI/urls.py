@@ -12,6 +12,7 @@ urlpatterns = [
 
     path('cart/menu-items', views.cart),
     path('orders', views.orders),
+    path('orders/<int:id>', views.single_order)
     
     # path('menu-items', views.ListMenuItems.as_view()),
 ]
