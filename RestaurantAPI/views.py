@@ -18,16 +18,6 @@ from django.db.models.query import QuerySet
 
 # Create your views here.
 
-@api_view()
-def test(request:Request):
-    users = User.objects.all()
-    return Response({"msg": str(users)})
-
-
-# class ListMenuItems(generics.ListAPIView):
-#     queryset = MenuItem.objects.all()
-#     serializer_class = MenuItemSerializer
-
 @api_view(['GET','POST'])
 @permission_classes([IsAuthenticated])
 def menuitems(request:Request):
